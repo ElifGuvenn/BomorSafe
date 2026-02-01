@@ -273,6 +273,7 @@
     </div>
 
     <script>
+        // --- WEBSOCKET BAĞLANTISI ---
         let wsAddress = "wss://bomorsafe.onrender.com";
         let ws = new WebSocket(wsAddress);
 
@@ -289,7 +290,7 @@
         };
         ws.onopen = () => console.log("Bağlandı");
         ws.onerror = () => {
-            document.getElementById("login-msg").innerText = "Sunucuya bağlanılamadı. 1 dk bekleip yenile.";
+            document.getElementById("login-msg").innerText = "Sunucuya bağlanılamadı. Sayfayı yenile.";
         };
 
         function send(komut, payload={}) {
@@ -306,7 +307,6 @@
 
             // --- HATA MESAJLARI ---
             if (data.type === "ERROR") {
-                // Hangi ekrandaysak hatayı oraya yaz
                 if (document.getElementById("screen-login").classList.contains("active")) {
                     document.getElementById("login-msg").innerText = data.msg;
                 } else if (document.getElementById("screen-register").classList.contains("active")) {
@@ -315,20 +315,16 @@
                     alert(data.msg);
                 }
             }
-
             // --- GİRİŞ BAŞARILI ---
             else if (data.type === "LOGIN_SUCCESS") {
                 myUsername = data.username;
                 document.getElementById("lobby-msg").innerText = "Hoşgeldin, " + myUsername;
                 changeScreen("screen-lobby");
             }
-
-            // --- KAYIT BAŞARILI (EKLENDİ) ---
-            // Sunucudan REGISTER_SUCCESS gelirse:
+            // --- KAYIT BAŞARILI ---
             else if (data.type === "REGISTER_SUCCESS") {
                 alert("Kayıt Başarılı! Şimdi giriş yapabilirsin.");
                 showLogin();
-                // Kullanıcı adını otomatik doldur
                 document.getElementById("inp-username").value = document.getElementById("reg-username").value;
             }
 
@@ -342,20 +338,19 @@
                 document.getElementById("inv-sender").innerText = inviteFrom;
                 document.getElementById("inv-msg").innerText = "masana katılmak istiyor!";
                 document.getElementById("popup-invite").style.display = "block";
-              else if (data.type === "INVITE_RECEIVED") {
+
+                // Burada buton "Kabul" ise "JOIN_ACCEPT" falan yapmak gerekebilir ama
+                // Şimdilik standart kabul fonksiyonu çalışsın: acceptInvite()
+            }
+            // --- DAVET ALINDI (BURASI EKSİKTİ VE HATALIYDI) ---
+            else if (data.type === "INVITE_RECEIVED") {
                 inviteFrom = data.from;
                 document.getElementById("inv-sender").innerText = inviteFrom;
-                document.getElementById("inv-msg").innerText = "seni masasına çağırıyor!"; // Mesajı değiştirdik
+                document.getElementById("inv-msg").innerText = "seni masasına çağırıyor!";
                 document.getElementById("popup-invite").style.display = "block";
-
-                // Kabul Butonunun Görevini Değiştiriyoruz (Özel Taktik)
-                // Kabul edince, biz ona "Katılma İsteği" atacağız
-                document.querySelector("#popup-invite .btn-yesil").onclick = function() {
-                    document.getElementById("popup-invite").style.display = "none";
-                    send("JOIN_REQUEST", {target: inviteFrom});
-                };
             }
-            } else if (data.type === "GAME_START") {
+
+            else if (data.type === "GAME_START") {
                 currentGameId = data.gid;
                 myRole = data.role;
                 setupGrid(data.size);
@@ -370,7 +365,6 @@
         function changeScreen(id) {
             document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
             document.getElementById(id).classList.add("active");
-            // Ekran değişince hata mesajlarını temizle
             document.getElementById("login-msg").innerText = "";
             document.getElementById("reg-msg").innerText = "";
         }
@@ -436,9 +430,25 @@
                 alert("Lütfen davet etmek istediğin arkadaşının adını yaz!");
                 return;
             }
-            // Sunucuya "Bu arkadaşa davet yolla" diyoruz
             send("SEND_INVITE", {target: target});
             alert("Davet gönderildi!");
+        }
+
+        // --- BU FONKSİYONLAR EKSİKTİ, EKLENDİ ---
+        function acceptInvite() {
+            document.getElementById("popup-invite").style.display = "none";
+            // Eğer "Davet" ise kabul edince biz ona "Katılma İsteği" atarız
+            if (document.getElementById("inv-msg").innerText.includes("çağırıyor")) {
+                send("JOIN_REQUEST", {target: inviteFrom});
+            } else {
+                // Eğer "Katılma İsteği" ise kabul edince sunucuya "Kabul Ettim" deriz
+                // (Şu an server'da ACCEPT_INVITE yoksa bile burası dursun)
+                send("ACCEPT_INVITE", {target: inviteFrom});
+            }
+        }
+
+        function declineInvite() {
+            document.getElementById("popup-invite").style.display = "none";
         }
 
         function renderRooms(rooms) {
@@ -465,8 +475,6 @@
             let container = document.getElementById("grid-container");
             container.innerHTML = "";
             let rows = totalTiles / 3;
-            // 3 satırsa tile 120px, 4 satırsa 90px vb.
-            // CSS grid ile daha kolay
             container.style.gridTemplateColumns = "1fr 1fr 1fr";
             container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
