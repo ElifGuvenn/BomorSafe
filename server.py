@@ -88,6 +88,23 @@ async def handler(websocket):
                 target = data["target"]
                 await broadcast_to_user(target, {"type": "JOIN_REQ", "from": my_username})
 
+            elif komut == "SEND_INVITE":
+                target_user = data.get("target")
+                target_ws = connected_users.get(target_user)
+
+                if target_ws:
+                    # Hedef kullanıcıya davet mesajı ilet
+                    await target_ws.send(json.dumps({
+                        "type": "INVITE_RECEIVED",
+                        "from": username
+                    }))
+                else:
+                    # Kullanıcı yoksa hata ver
+                    await websocket.send(json.dumps({
+                        "type": "ERROR",
+                        "msg": f"Kullanıcı bulunamadı: {target_user}"
+                    }))
+
             elif komut == "ACCEPT_INVITE":
                 rakip = data["target"]
 
