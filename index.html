@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bom or Safe - Original Look</title>
+    <title>Bom or Safe - Online</title>
     <style>
         /* --- TEMEL AYARLAR --- */
         body {
@@ -14,14 +14,14 @@
             height: 100vh;
             margin: 0;
             font-family: 'Segoe UI', sans-serif;
-            overflow: hidden; /* Scrollbar çıkmasın */
+            overflow: hidden;
         }
 
-        /* PYGAME PENCERESİ (400x600) */
+        /* OYUN PENCERESİ */
         #game-container {
             width: 400px;
             height: 600px;
-            background-color: rgb(243, 244, 246); /* ACIK_GRI */
+            background-color: rgb(243, 244, 246);
             position: relative;
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
             overflow: hidden;
@@ -38,11 +38,10 @@
         }
         .active { display: block; }
 
-        /* Gölge ve Yuvarlak Köşe Mantığı (shadow_rect) */
         .py-component {
             position: absolute;
             border-radius: 12px;
-            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.15); /* Basit gölge efekti */
+            box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.15);
             border: none;
             outline: none;
             font-family: 'Segoe UI', sans-serif;
@@ -58,7 +57,7 @@
             box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.15);
         }
 
-        /* RENKLER (Python kodundaki RGB'ler) */
+        /* RENKLER */
         .btn-mavi { background: linear-gradient(to bottom, rgb(67, 97, 238), rgb(45, 55, 180)); color: white; }
         .btn-yesil { background: linear-gradient(to bottom, rgb(52, 211, 153), rgb(16, 185, 129)); color: white; }
         .btn-kirmizi { background: linear-gradient(to bottom, rgb(239, 68, 68), rgb(220, 38, 38)); color: white; }
@@ -66,11 +65,10 @@
         .btn-gri { background: linear-gradient(to bottom, rgb(229, 231, 235), rgb(107, 114, 128)); color: black; }
         .btn-mor { background-color: rgb(168, 85, 247); color: white; }
 
-        /* INPUT KUTULARI */
         .py-input {
             position: absolute;
             background: white;
-            border: 2px solid rgb(107, 114, 128); /* KOYU_GRI */
+            border: 2px solid rgb(107, 114, 128);
             border-radius: 10px;
             padding: 0 15px;
             font-size: 18px;
@@ -79,7 +77,6 @@
         }
         .py-input:focus { border-color: rgb(67, 97, 238); }
 
-        /* HEADER (Gradient Rect) */
         .header {
             width: 400px;
             height: 150px;
@@ -98,16 +95,14 @@
             font-size: 36px; font-weight: bold; color: rgb(239, 68, 68);
         }
 
-        /* --- OYUN ALANI IZGARA --- */
         #grid-container {
             position: absolute;
-            top: 120px; /* Python'daki PANEL değişkeni */
+            top: 120px;
             left: 0;
             width: 400px;
             height: 400px;
             background: white;
             display: grid;
-            /* Grid yapısını JS ile ayarlayacağız */
         }
         .tile {
             border: 1px solid rgb(229, 231, 235);
@@ -115,13 +110,11 @@
             font-size: 24px; cursor: pointer;
             position: relative;
         }
-        /* Grid Çizgileri */
         .tile:after {
             content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
             border: 1px solid #e5e7eb;
         }
 
-        /* KALP VE KARTLAR */
         .player-card {
             position: absolute; top: 15px; width: 180px; height: 90px;
             background: rgb(243, 244, 246);
@@ -134,7 +127,6 @@
 
         .hearts-container { color: rgb(239, 68, 68); font-size: 24px; margin-top: 5px; }
 
-        /* POPUP VE LISTELER */
         .room-row {
             width: 320px; height: 45px;
             background: rgb(229, 231, 235);
@@ -156,11 +148,10 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
 
-        /* BOMBA VE ICONLAR */
         .bomb-icon {
             width: 40px; height: 40px; border-radius: 50%;
             background: rgb(239, 68, 68); border: 4px solid rgb(239, 68, 68);
-            box-shadow: inset 0 0 0 4px rgb(251, 191, 36); /* ALTIN Çember */
+            box-shadow: inset 0 0 0 4px rgb(251, 191, 36);
         }
     </style>
 </head>
@@ -179,7 +170,7 @@
 
             <button class="py-component btn-mavi" style="left: 50px; top: 350px; width: 300px; height: 55px;" onclick="doLogin()">GİRİŞ YAP</button>
 
-            <div id="login-msg" style="position: absolute; top: 420px; width: 100%; text-align: center; color: red;"></div>
+            <div id="login-msg" style="position: absolute; top: 420px; width: 100%; text-align: center; color: red; font-weight: bold; font-size: 14px;"></div>
 
             <div style="position: absolute; top: 485px; width: 100%; text-align: center; color: rgb(67, 97, 238); cursor: pointer; text-decoration: underline;" onclick="showRegister()">
                 Hesabın yok mu? Kayıt Ol
@@ -198,7 +189,8 @@
             <input type="password" id="reg-password" class="py-input" style="left: 50px; top: 270px; width: 300px; height: 50px;" placeholder="Şifre (Min 8)">
 
             <button class="py-component btn-yesil" style="left: 50px; top: 350px; width: 300px; height: 55px;" onclick="doRegister()">KAYIT OL</button>
-            <div id="reg-msg" style="position: absolute; top: 420px; width: 100%; text-align: center; color: red;"></div>
+
+            <div id="reg-msg" style="position: absolute; top: 420px; width: 100%; text-align: center; color: red; font-weight: bold; font-size: 14px;"></div>
         </div>
 
         <div id="screen-lobby" class="screen">
@@ -281,12 +273,8 @@
     </div>
 
     <script>
-        // --- WEBSOCKET BAĞLANTISI ---
-        // Localde çalışıyorsan: ws://localhost:8765
-        // Ngrok vb. kullanıyorsan: wss://...
-
-        let ws = new WebSocket(wsAddress);
         let wsAddress = "wss://bomorsafe.onrender.com";
+        let ws = new WebSocket(wsAddress);
 
         let myUsername = "";
         let selectedSize = 9; // Varsayılan boyut
@@ -300,9 +288,15 @@
             handleData(data);
         };
         ws.onopen = () => console.log("Bağlandı");
-        ws.onerror = () => alert("Sunucuya bağlanılamadı. Server.py çalışıyor mu?");
+        ws.onerror = () => {
+            document.getElementById("login-msg").innerText = "Sunucuya bağlanılamadı. 1 dk bekleip yenile.";
+        };
 
         function send(komut, payload={}) {
+            if (ws.readyState !== WebSocket.OPEN) {
+                alert("Sunucuyla bağlantı yok. Lütfen sayfayı yenile ve 10-15 saniye bekle.");
+                return;
+            }
             payload.komut = komut;
             ws.send(JSON.stringify(payload));
         }
@@ -310,12 +304,35 @@
         function handleData(data) {
             console.log("Gelen:", data);
 
-            if (data.type === "LOGIN_SUCCESS") {
+            // --- HATA MESAJLARI ---
+            if (data.type === "ERROR") {
+                // Hangi ekrandaysak hatayı oraya yaz
+                if (document.getElementById("screen-login").classList.contains("active")) {
+                    document.getElementById("login-msg").innerText = data.msg;
+                } else if (document.getElementById("screen-register").classList.contains("active")) {
+                    document.getElementById("reg-msg").innerText = data.msg;
+                } else {
+                    alert(data.msg);
+                }
+            }
+
+            // --- GİRİŞ BAŞARILI ---
+            else if (data.type === "LOGIN_SUCCESS") {
                 myUsername = data.username;
+                document.getElementById("lobby-msg").innerText = "Hoşgeldin, " + myUsername;
                 changeScreen("screen-lobby");
-            } else if (data.type === "ERROR") {
-                alert(data.msg);
-            } else if (data.type === "ROOM_CREATED") {
+            }
+
+            // --- KAYIT BAŞARILI (EKLENDİ) ---
+            // Sunucudan REGISTER_SUCCESS gelirse:
+            else if (data.type === "REGISTER_SUCCESS") {
+                alert("Kayıt Başarılı! Şimdi giriş yapabilirsin.");
+                showLogin();
+                // Kullanıcı adını otomatik doldur
+                document.getElementById("inp-username").value = document.getElementById("reg-username").value;
+            }
+
+            else if (data.type === "ROOM_CREATED") {
                 document.getElementById("lobby-menu").style.display = "none";
                 document.getElementById("lobby-wait").style.display = "block";
             } else if (data.type === "ROOM_LIST") {
@@ -325,6 +342,19 @@
                 document.getElementById("inv-sender").innerText = inviteFrom;
                 document.getElementById("inv-msg").innerText = "masana katılmak istiyor!";
                 document.getElementById("popup-invite").style.display = "block";
+              else if (data.type === "INVITE_RECEIVED") {
+                inviteFrom = data.from;
+                document.getElementById("inv-sender").innerText = inviteFrom;
+                document.getElementById("inv-msg").innerText = "seni masasına çağırıyor!"; // Mesajı değiştirdik
+                document.getElementById("popup-invite").style.display = "block";
+
+                // Kabul Butonunun Görevini Değiştiriyoruz (Özel Taktik)
+                // Kabul edince, biz ona "Katılma İsteği" atacağız
+                document.querySelector("#popup-invite .btn-yesil").onclick = function() {
+                    document.getElementById("popup-invite").style.display = "none";
+                    send("JOIN_REQUEST", {target: inviteFrom});
+                };
+            }
             } else if (data.type === "GAME_START") {
                 currentGameId = data.gid;
                 myRole = data.role;
@@ -340,17 +370,22 @@
         function changeScreen(id) {
             document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
             document.getElementById(id).classList.add("active");
+            // Ekran değişince hata mesajlarını temizle
+            document.getElementById("login-msg").innerText = "";
+            document.getElementById("reg-msg").innerText = "";
         }
 
         // Giriş / Kayıt
         function showRegister() { changeScreen("screen-register"); }
         function showLogin() { changeScreen("screen-login"); }
         function doLogin() {
+            document.getElementById("login-msg").innerText = "Bağlanıyor...";
             let u = document.getElementById("inp-username").value;
             let p = document.getElementById("inp-password").value;
             send("LOGIN", {username: u, password: p});
         }
         function doRegister() {
+            document.getElementById("reg-msg").innerText = "Kayıt olunuyor...";
             let u = document.getElementById("reg-username").value;
             let p = document.getElementById("reg-password").value;
             send("REGISTER", {username: u, password: p});
@@ -373,7 +408,6 @@
             send("GET_ROOMS");
         }
         function leaveRoom() {
-            // Basitçe lobiye dön, server temizler
             resetLobby();
         }
 
@@ -398,23 +432,19 @@
         // Davet İşlemleri
         function inviteDirect() {
             let target = document.getElementById("search-user").value;
-            // Burası server'da henüz tam implemente değilse, sadece JOIN_REQUEST mantığı çalışabilir
-            // Server'a "Direct Invite" komutu eklenmeli, şimdilik JOIN_REQ üzerinden gidelim
-            alert("Davet gönderildi (Simulasyon)");
-        }
-        function acceptInvite() {
-            document.getElementById("popup-invite").style.display = "none";
-            send("ACCEPT_INVITE", {target: inviteFrom});
-        }
-        function declineInvite() {
-            document.getElementById("popup-invite").style.display = "none";
+            if (!target) {
+                alert("Lütfen davet etmek istediğin arkadaşının adını yaz!");
+                return;
+            }
+            // Sunucuya "Bu arkadaşa davet yolla" diyoruz
+            send("SEND_INVITE", {target: target});
+            alert("Davet gönderildi!");
         }
 
         function renderRooms(rooms) {
             let container = document.getElementById("room-container");
             container.innerHTML = "";
             rooms.forEach(room => {
-                // Oda satırı HTML'i
                 let row = document.createElement("div");
                 row.className = "room-row";
                 row.innerHTML = `
@@ -435,9 +465,8 @@
             let container = document.getElementById("grid-container");
             container.innerHTML = "";
             let rows = totalTiles / 3;
-            let tileHeight = 400 / rows;
-
-            // Grid CSS ayarı
+            // 3 satırsa tile 120px, 4 satırsa 90px vb.
+            // CSS grid ile daha kolay
             container.style.gridTemplateColumns = "1fr 1fr 1fr";
             container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
@@ -450,8 +479,6 @@
                     container.appendChild(tile);
                 }
             }
-
-            // UI Reset
             document.getElementById("btn-back-lobby").style.display = "none";
         }
 
@@ -463,34 +490,28 @@
             let me = myRole === 0 ? state.p1 : state.p2;
             let opp = myRole === 0 ? state.p2 : state.p1;
 
-            // Kalpler
             document.getElementById("my-hearts").innerText = "❤️".repeat(me.can);
             document.getElementById("opp-hearts").innerText = "❤️".repeat(opp.can);
 
-            // Durum Çubuğu
             let statusBar = document.getElementById("game-status");
             if (state.durum === "HAZIRLIK") {
                 if (!me.hazir) {
                     statusBar.innerText = `Bombaları Yerleştir: ${3 - me.secilen_bomba}`;
-                    statusBar.style.color = "rgb(251, 191, 36)"; // Altın
+                    statusBar.style.color = "rgb(251, 191, 36)";
                     statusBar.style.borderColor = "rgb(251, 191, 36)";
                 } else {
                     statusBar.innerText = "Rakip Bekleniyor...";
-                    statusBar.style.color = "rgb(107, 114, 128)"; // Gri
+                    statusBar.style.color = "rgb(107, 114, 128)";
                     statusBar.style.borderColor = "rgb(107, 114, 128)";
                 }
 
-                // Kendi bombalarımı göster
                 if (state.my_board) {
                     for(let r=0; r<state.rows; r++) {
                         for(let c=0; c<3; c++) {
                             let tile = document.getElementById(`tile-${r}-${c}`);
-                            // Temizle önce
                             tile.innerHTML = "";
                             tile.style.background = "white";
-
                             if (state.my_board[r][c] === 1) {
-                                // Bombayı göster (Daire içinde daire simülasyonu)
                                 tile.innerHTML = `<div class="bomb-icon"></div>`;
                             }
                         }
@@ -500,7 +521,7 @@
             } else if (state.durum === "OYNANIYOR") {
                 if (state.sira === me.isim) {
                     statusBar.innerText = "SIRA SENDE!";
-                    statusBar.style.color = "rgb(16, 185, 129)"; // Yeşil
+                    statusBar.style.color = "rgb(16, 185, 129)";
                     statusBar.style.borderColor = "rgb(16, 185, 129)";
                 } else {
                     statusBar.innerText = "Rakip Düşünüyor...";
@@ -515,7 +536,6 @@
                 document.getElementById("btn-back-lobby").style.display = "block";
             }
 
-            // Açılan Kareler
             state.acilan_kareler.forEach(m => {
                 let r=m[0], c=m[1], type=m[2];
                 let tile = document.getElementById(`tile-${r}-${c}`);
