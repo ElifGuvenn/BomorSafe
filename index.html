@@ -15,6 +15,7 @@
             margin: 0;
             font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
+            user-select: none; /* Yazı seçimini engelle */
         }
 
         /* OYUN PENCERESİ */
@@ -103,6 +104,7 @@
             height: 400px;
             background: white;
             display: grid;
+            /* Grid şablonu JS ile dinamik ayarlanacak */
         }
         .tile {
             border: 1px solid rgb(229, 231, 235);
@@ -148,11 +150,31 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
 
-        .bomb-icon {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: rgb(239, 68, 68); border: 4px solid rgb(239, 68, 68);
-            box-shadow: inset 0 0 0 4px rgb(251, 191, 36);
+        /* --- YENİ EKLENEN STİLLER (Senin Tasarımına Uygun) --- */
+
+        /* Bomba Yerleştirme İşareti (Sarı Top) */
+        .bomb-marker {
+            width: 20px; height: 20px;
+            background: rgb(251, 191, 36); /* ALTIN */
+            border-radius: 50%;
+            border: 3px solid rgb(239, 68, 68); /* KIRMIZI ÇERÇEVE */
         }
+
+        /* Sonuç Yazıları */
+        .result-safe { color: rgb(16, 185, 129); font-weight: bold; font-size: 20px; }
+        .result-bom { color: rgb(239, 68, 68); font-weight: bold; font-size: 20px; }
+
+        /* Geri Sayım Ekranı */
+        #countdown-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgb(67, 97, 238), rgb(45, 55, 180));
+            display: none; z-index: 200;
+            flex-direction: column; align-items: center; justify-content: center;
+            color: white;
+        }
+        #cnt-text { font-size: 32px; font-weight: bold; margin-bottom: 20px; }
+        #cnt-num { font-size: 120px; font-weight: bold; color: rgb(251, 191, 36); text-shadow: 4px 4px 0px rgba(0,0,0,0.2); }
+
     </style>
 </head>
 <body>
@@ -209,10 +231,12 @@
 
             <div id="lobby-search" style="display: none;">
                 <button class="py-component btn-gri" style="left: 20px; top: 20px; width: 100px; height: 40px; font-size: 15px;" onclick="resetLobby()">&lt; Geri</button>
+
+                <div style="position: absolute; top: 200px; left: 50px; font-weight: bold; color: rgb(67, 97, 238);">Harita Boyutu Seç:</div>
+                <button class="py-component btn-mavi" style="left: 50px; top: 240px; width: 300px; height: 50px;" onclick="openSizePopup('SEARCH')">Boyut Seç (Şuan: 9)</button>
+
                 <input type="text" id="search-user" class="py-input" style="left: 50px; top: 460px; width: 200px; height: 45px;" placeholder="Kullanıcı Adı">
                 <button class="py-component btn-mor" style="left: 260px; top: 460px; width: 90px; height: 45px;" onclick="inviteDirect()">Davet</button>
-                <div id="search-info" style="position: absolute; top: 420px; width: 100%; text-align: center; color: rgb(67, 97, 238);">Harita Seç: 9 Karo</div>
-                <button class="py-component btn-mavi" style="left: 100px; top: 200px; width: 200px; height: 50px;" onclick="openSizePopup('SEARCH')">Harita Boyutu Seç</button>
             </div>
 
             <div id="lobby-wait" style="display: none; text-align: center; padding-top: 300px; color: #6b7280; font-size: 18px;">
@@ -270,6 +294,11 @@
             <button id="btn-back-lobby" class="py-component btn-mavi" style="display: none; left: 100px; top: 480px; width: 200px; height: 50px;" onclick="returnToLobby()">Lobiye Dön</button>
         </div>
 
+        <div id="countdown-layer">
+            <div id="cnt-text">HAZIR OL!</div>
+            <div id="cnt-num">3</div>
+        </div>
+
     </div>
 
     <script>
@@ -281,8 +310,10 @@
         let selectedSize = 9; // Varsayılan boyut
         let popupAim = ""; // CREATE veya SEARCH
         let currentGameId = 0;
-        let myRole = 0; // 0: P1, 1: P2
         let inviteFrom = "";
+        let inviteData = {};
+        let gameState = "HAZIRLIK"; // HAZIRLIK, OYNANIYOR, BITTI
+        let bombsPlaced = 0;
 
         ws.onmessage = (event) => {
             let data = JSON.parse(event.data);
@@ -305,55 +336,86 @@
         function handleData(data) {
             console.log("Gelen:", data);
 
-            // --- HATA MESAJLARI ---
-            if (data.type === "ERROR") {
-                if (document.getElementById("screen-login").classList.contains("active")) {
-                    document.getElementById("login-msg").innerText = data.msg;
-                } else if (document.getElementById("screen-register").classList.contains("active")) {
-                    document.getElementById("reg-msg").innerText = data.msg;
-                } else {
-                    alert(data.msg);
-                }
-            }
-            // --- GİRİŞ BAŞARILI ---
-            else if (data.type === "LOGIN_SUCCESS") {
+            // --- GİRİŞ & KAYIT ---
+            if (data.type === "LOGIN_SUCCESS") {
                 myUsername = data.username;
                 document.getElementById("lobby-msg").innerText = "Hoşgeldin, " + myUsername;
                 changeScreen("screen-lobby");
             }
-            // --- KAYIT BAŞARILI ---
             else if (data.type === "REGISTER_SUCCESS") {
                 alert("Kayıt Başarılı! Şimdi giriş yapabilirsin.");
                 showLogin();
                 document.getElementById("inp-username").value = document.getElementById("reg-username").value;
             }
-
-            else if (data.type === "ROOM_CREATED") {
-                document.getElementById("lobby-menu").style.display = "none";
-                document.getElementById("lobby-wait").style.display = "block";
-            } else if (data.type === "ROOM_LIST") {
-                renderRooms(data.rooms);
-            } else if (data.type === "JOIN_REQ") {
-                inviteFrom = data.from;
-                document.getElementById("inv-sender").innerText = inviteFrom;
-                document.getElementById("inv-msg").innerText = "masana katılmak istiyor!";
-                document.getElementById("popup-invite").style.display = "block";
+            else if (data.type === "ERROR") {
+                if (document.getElementById("screen-login").classList.contains("active")) {
+                    document.getElementById("login-msg").innerText = data.msg;
+                } else {
+                    alert(data.msg);
+                }
             }
-            // --- DAVET ALINDI ---
+
+            // --- LOBİ & DAVET ---
+            else if (data.type === "ROOM_LIST") {
+                renderRooms(data.rooms);
+            }
             else if (data.type === "INVITE_RECEIVED") {
                 inviteFrom = data.from;
+                inviteData = data; // Size bilgisini sakla
                 document.getElementById("inv-sender").innerText = inviteFrom;
-                document.getElementById("inv-msg").innerText = "seni masasına çağırıyor!";
+                document.getElementById("inv-msg").innerText = data.size + " karoluk maça çağırıyor!";
                 document.getElementById("popup-invite").style.display = "block";
             }
 
-            else if (data.type === "GAME_START") {
+            // --- OYUN BAŞLANGICI ---
+            else if (data.type === "GAME_INIT") {
                 currentGameId = data.gid;
-                myRole = data.role;
+                gameState = "HAZIRLIK";
+                bombsPlaced = 0;
                 setupGrid(data.size);
+                document.getElementById("popup-invite").style.display = "none";
                 changeScreen("screen-game");
-            } else if (data.type === "GAME_STATE") {
-                updateGame(data);
+                resetGameUI();
+            }
+
+            // --- OYUN İÇİ OLAYLAR ---
+            else if (data.type === "BOMB_PLACED") {
+                // Kendi koyduğum bombayı işaretle (Sarı Top)
+                let cell = document.getElementById(`tile-${data.r}-${data.c}`);
+                cell.innerHTML = '<div class="bomb-marker"></div>';
+            }
+            else if (data.type === "START_COUNTDOWN") {
+                startCountdown();
+            }
+            else if (data.type === "GAME_STARTED_NOW") {
+                gameState = "OYNANIYOR";
+                updateStatus(data.turn);
+            }
+            else if (data.type === "UPDATE_BOARD") {
+                let cell = document.getElementById(`tile-${data.r}-${data.c}`);
+                cell.innerHTML = ""; // Bombayı sil
+
+                if(data.res === "BOM") {
+                    cell.innerText = "BOM";
+                    cell.className = "tile result-bom";
+                } else {
+                    cell.innerText = "SAFE";
+                    cell.className = "tile result-safe";
+                }
+
+                // Canları güncelle
+                document.getElementById("my-hearts").innerText = "❤️".repeat(data.p1_lives);
+                document.getElementById("opp-hearts").innerText = "❤️".repeat(data.p2_lives);
+
+                updateStatus(data.turn);
+            }
+            else if (data.type === "GAME_OVER") {
+                let status = document.getElementById("game-status");
+                let imWinner = (data.winner === myUsername);
+                status.innerText = imWinner ? "KAZANDIN! 🎉" : "KAYBETTİN 💀";
+                status.style.color = imWinner ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)";
+                status.style.borderColor = status.style.color;
+                document.getElementById("btn-back-lobby").style.display = "block";
             }
         }
 
@@ -366,9 +428,9 @@
             document.getElementById("reg-msg").innerText = "";
         }
 
-        // Giriş / Kayıt
         function showRegister() { changeScreen("screen-register"); }
         function showLogin() { changeScreen("screen-login"); }
+
         function doLogin() {
             document.getElementById("login-msg").innerText = "Bağlanıyor...";
             let u = document.getElementById("inp-username").value;
@@ -382,12 +444,10 @@
             send("REGISTER", {username: u, password: p});
         }
 
-        // Lobi İşlemleri
         function resetLobby() {
             document.getElementById("lobby-menu").style.display = "block";
             document.getElementById("lobby-search").style.display = "none";
             document.getElementById("lobby-list").style.display = "none";
-            document.getElementById("lobby-wait").style.display = "none";
         }
         function showSearchMode() {
             document.getElementById("lobby-menu").style.display = "none";
@@ -398,11 +458,12 @@
             document.getElementById("lobby-list").style.display = "block";
             send("GET_ROOMS");
         }
-        function leaveRoom() {
+        function returnToLobby() {
+            changeScreen("screen-lobby");
             resetLobby();
         }
 
-        // Popup Boyut Seçimi
+        // --- BOYUT SEÇİMİ ---
         function openSizePopup(aim) {
             popupAim = aim;
             document.getElementById("popup-size").style.display = "block";
@@ -413,59 +474,37 @@
         function selectSize(size) {
             selectedSize = size;
             closeSizePopup();
-            if (popupAim === "CREATE") {
-                send("CREATE_ROOM", {size: size});
-            } else if (popupAim === "SEARCH") {
-                document.getElementById("search-info").innerText = "Seçilen Harita: " + size + " Karo";
+            if (popupAim === "SEARCH") {
+                document.querySelector("#lobby-search button.btn-mavi").innerText = "Boyut Seç (Şuan: " + size + ")";
             }
         }
 
-        // Davet İşlemleri
+        // --- DAVET SİSTEMİ ---
         function inviteDirect() {
             let target = document.getElementById("search-user").value;
-            if (!target) {
-                alert("Lütfen davet etmek istediğin arkadaşının adını yaz!");
-                return;
-            }
-            send("SEND_INVITE", {target: target});
+            if (!target) { alert("İsim yaz!"); return; }
+            // Boyut bilgisini de gönderiyoruz
+            send("SEND_INVITE", {target: target, size: selectedSize});
             alert("Davet gönderildi!");
         }
 
-        // --- GÜNCELLENEN KABUL MANTIĞI ---
         function acceptInvite() {
+            // Gelen davetin boyutu ve göndereni ile kabul et
+            send("ACCEPT_INVITE", {target: inviteFrom, size: inviteData.size});
             document.getElementById("popup-invite").style.display = "none";
-            // Direkt ACCEPT_INVITE gönderiyoruz, sunucu oyunu başlatacak
-            send("ACCEPT_INVITE", {target: inviteFrom});
         }
-
         function declineInvite() {
             document.getElementById("popup-invite").style.display = "none";
         }
 
-        function renderRooms(rooms) {
-            let container = document.getElementById("room-container");
-            container.innerHTML = "";
-            rooms.forEach(room => {
-                let row = document.createElement("div");
-                row.className = "room-row";
-                row.innerHTML = `
-                    <span style="font-weight:bold; width: 180px;">${room.host} (${room.size}li)</span>
-                    <button class="py-component btn-mavi" style="position:relative; width: 80px; height: 35px; font-size:14px;"
-                        onclick="joinRoom('${room.host}')">İstek</button>
-                `;
-                container.appendChild(row);
-            });
-        }
-        function joinRoom(host) {
-            send("JOIN_REQUEST", {target: host});
-        }
-
-        // --- OYUN ALANI ---
+        // --- OYUN ALANI VE MANTIĞI ---
 
         function setupGrid(totalTiles) {
             let container = document.getElementById("grid-container");
             container.innerHTML = "";
             let rows = totalTiles / 3;
+
+            // Satır yüksekliğini dinamik ayarla (400px toplam yükseklik / satır sayısı)
             container.style.gridTemplateColumns = "1fr 1fr 1fr";
             container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
@@ -482,71 +521,69 @@
         }
 
         function doMove(r, c) {
-            send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
-        }
+            // Hazırlık aşamasında bomba koyma
+            if (gameState === "HAZIRLIK") {
+                if (bombsPlaced < 3) {
+                    send("PLACE_BOMB", {gid: currentGameId, r: r, c: c});
+                    bombsPlaced++;
 
-        function updateGame(state) {
-            let me = myRole === 0 ? state.p1 : state.p2;
-            let opp = myRole === 0 ? state.p2 : state.p1;
-
-            document.getElementById("my-hearts").innerText = "❤️".repeat(me.can);
-            document.getElementById("opp-hearts").innerText = "❤️".repeat(opp.can);
-
-            let statusBar = document.getElementById("game-status");
-            if (state.durum === "HAZIRLIK") {
-                if (!me.hazir) {
-                    statusBar.innerText = `Bombaları Yerleştir: ${3 - me.secilen_bomba}`;
-                    statusBar.style.color = "rgb(251, 191, 36)";
-                    statusBar.style.borderColor = "rgb(251, 191, 36)";
-                } else {
-                    statusBar.innerText = "Rakip Bekleniyor...";
-                    statusBar.style.color = "rgb(107, 114, 128)";
-                    statusBar.style.borderColor = "rgb(107, 114, 128)";
-                }
-
-                if (state.my_board) {
-                    for(let r=0; r<state.rows; r++) {
-                        for(let c=0; c<3; c++) {
-                            let tile = document.getElementById(`tile-${r}-${c}`);
-                            tile.innerHTML = "";
-                            tile.style.background = "white";
-                            if (state.my_board[r][c] === 1) {
-                                tile.innerHTML = `<div class="bomb-icon"></div>`;
-                            }
-                        }
+                    let st = document.getElementById("game-status");
+                    if(bombsPlaced < 3) {
+                        st.innerText = `Bomba Yerleştir: ${3 - bombsPlaced}`;
+                    } else {
+                        st.innerText = "Rakip Bekleniyor...";
+                        st.style.color = "rgb(251, 146, 60)"; // Turuncu
+                        st.style.borderColor = st.style.color;
                     }
                 }
-
-            } else if (state.durum === "OYNANIYOR") {
-                if (state.sira === me.isim) {
-                    statusBar.innerText = "SIRA SENDE!";
-                    statusBar.style.color = "rgb(16, 185, 129)";
-                    statusBar.style.borderColor = "rgb(16, 185, 129)";
-                } else {
-                    statusBar.innerText = "Rakip Düşünüyor...";
-                    statusBar.style.color = "rgb(107, 114, 128)";
-                    statusBar.style.borderColor = "rgb(107, 114, 128)";
-                }
-            } else if (state.durum === "BITTI") {
-                let win = me.can > 0;
-                statusBar.innerText = win ? "KAZANDIN! 🎉" : "KAYBETTİN 💀";
-                statusBar.style.color = win ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)";
-                statusBar.style.borderColor = statusBar.style.color;
-                document.getElementById("btn-back-lobby").style.display = "block";
             }
-
-            state.acilan_kareler.forEach(m => {
-                let r=m[0], c=m[1], type=m[2];
-                let tile = document.getElementById(`tile-${r}-${c}`);
-                tile.innerHTML = type === "BOM" ? "BOM" : "SAFE";
-                tile.style.color = type === "BOM" ? "rgb(239, 68, 68)" : "rgb(16, 185, 129)";
-                tile.style.fontWeight = "bold";
-            });
+            // Oyun aşamasında hamle yapma
+            else if (gameState === "OYNANIYOR") {
+                send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
+            }
         }
 
-        function returnToLobby() {
-            changeScreen("screen-lobby");
-            resetLobby();
+        function startCountdown() {
+            let layer = document.getElementById("countdown-layer");
+            let num = document.getElementById("cnt-num");
+            layer.style.display = "flex";
+
+            let count = 3;
+            num.innerText = count;
+
+            let timer = setInterval(() => {
+                count--;
+                if(count > 0) {
+                    num.innerText = count;
+                } else if (count === 0) {
+                    num.innerText = "BAŞLA!";
+                } else {
+                    clearInterval(timer);
+                    layer.style.display = "none";
+                }
+            }, 1000);
+        }
+
+        function resetGameUI() {
+            document.getElementById("my-hearts").innerText = "❤️❤️❤️";
+            document.getElementById("opp-hearts").innerText = "❤️❤️❤️";
+            let st = document.getElementById("game-status");
+            st.innerText = "Bombaları Yerleştir: 3";
+            st.style.color = "rgb(251, 191, 36)"; // Altın
+            st.style.borderColor = st.style.color;
+        }
+
+        function updateStatus(turn) {
+            let st = document.getElementById("game-status");
+            if(turn === myUsername) {
+                st.innerText = "SIRA SENDE!";
+                st.style.color = "rgb(16, 185, 129)"; // Yeşil
+                st.style.borderColor = st.style.color;
+            } else {
+                st.innerText = "Rakip Düşünüyor...";
+                st.style.color = "rgb(107, 114, 128)"; // Gri
+                st.style.borderColor = st.style.color;
+            }
         }
     </script>
 </body>
