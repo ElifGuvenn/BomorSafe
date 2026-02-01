@@ -338,11 +338,8 @@
                 document.getElementById("inv-sender").innerText = inviteFrom;
                 document.getElementById("inv-msg").innerText = "masana katılmak istiyor!";
                 document.getElementById("popup-invite").style.display = "block";
-
-                // Burada buton "Kabul" ise "JOIN_ACCEPT" falan yapmak gerekebilir ama
-                // Şimdilik standart kabul fonksiyonu çalışsın: acceptInvite()
             }
-            // --- DAVET ALINDI (BURASI EKSİKTİ VE HATALIYDI) ---
+            // --- DAVET ALINDI ---
             else if (data.type === "INVITE_RECEIVED") {
                 inviteFrom = data.from;
                 document.getElementById("inv-sender").innerText = inviteFrom;
@@ -434,17 +431,11 @@
             alert("Davet gönderildi!");
         }
 
-        // --- BU FONKSİYONLAR EKSİKTİ, EKLENDİ ---
+        // --- GÜNCELLENEN KABUL MANTIĞI ---
         function acceptInvite() {
             document.getElementById("popup-invite").style.display = "none";
-            // Eğer "Davet" ise kabul edince biz ona "Katılma İsteği" atarız
-            if (document.getElementById("inv-msg").innerText.includes("çağırıyor")) {
-                send("JOIN_REQUEST", {target: inviteFrom});
-            } else {
-                // Eğer "Katılma İsteği" ise kabul edince sunucuya "Kabul Ettim" deriz
-                // (Şu an server'da ACCEPT_INVITE yoksa bile burası dursun)
-                send("ACCEPT_INVITE", {target: inviteFrom});
-            }
+            // Direkt ACCEPT_INVITE gönderiyoruz, sunucu oyunu başlatacak
+            send("ACCEPT_INVITE", {target: inviteFrom});
         }
 
         function declineInvite() {
