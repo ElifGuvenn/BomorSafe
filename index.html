@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -8,14 +9,14 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-    background: linear-gradient(135deg, #434190 0%, #2c3e8f 100%); /* Koyu mavi tonları */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    user-select: none;
-}
+            background: linear-gradient(135deg, #434190 0%, #2c3e8f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
 
         #game-container {
             width: 400px;
@@ -315,14 +316,12 @@
             <div style="padding: 10px 20px;">
                 <div style="background: white; padding: 8px; border-radius: 8px; text-align: center; color: #6b7280; font-size: 13px; margin-bottom: 15px;" id="lobby-msg">Lobiye Hoşgeldiniz</div>
 
-                <!-- ANA MENÜ -->
                 <div id="lobby-menu">
-                    <button class="btn btn-mavi" style="width: 100%; margin-bottom: 15px;" onclick="showSearchMode()"> Rakip Ara</button>
-                    <button class="btn btn-yesil" style="width: 100%; margin-bottom: 15px;" onclick="showCreateRoom()"> Oyun Oluştur</button>
-                    <button class="btn btn-turuncu" style="width: 100%; margin-bottom: 15px;" onclick="showRoomList()"> Masalara Katıl</button>
+                    <button class="btn btn-mavi" style="width: 100%; margin-bottom: 15px;" onclick="showSearchMode()">Rakip Ara</button>
+                    <button class="btn btn-yesil" style="width: 100%; margin-bottom: 15px;" onclick="showCreateRoom()">Oyun Oluştur</button>
+                    <button class="btn btn-turuncu" style="width: 100%; margin-bottom: 15px;" onclick="showRoomList()">Masalara Katıl</button>
                 </div>
 
-                <!-- ARAMA MODU -->
                 <div id="lobby-search" style="display: none;">
                     <button class="btn btn-gri" style="padding: 10px 20px; font-size: 14px; margin-bottom: 20px;" onclick="resetLobby()">← Geri</button>
                     <div style="margin-bottom: 15px;">
@@ -337,7 +336,6 @@
                     <button class="btn btn-mor" style="width: 100%;" onclick="inviteDirect()">Davet Gönder</button>
                 </div>
 
-                <!-- ODA OLUŞTUR -->
                 <div id="lobby-create" style="display: none;">
                     <button class="btn btn-gri" style="padding: 10px 20px; font-size: 14px; margin-bottom: 20px;" onclick="resetLobby()">← Geri</button>
                     <div style="margin-bottom: 15px;">
@@ -355,7 +353,6 @@
                     </div>
                 </div>
 
-                <!-- ODA LİSTESİ -->
                 <div id="lobby-list" style="display: none;">
                     <button class="btn btn-gri" style="padding: 10px 20px; font-size: 14px; margin-bottom: 15px;" onclick="resetLobby()">← Geri</button>
                     <div id="room-container" style="max-height: 380px; overflow-y: auto;"></div>
@@ -384,13 +381,11 @@
             </div>
         </div>
 
-        <!-- GERİ SAYIM -->
         <div id="countdown-layer" class="countdown-layer">
             <div class="countdown-text">HAZIR OL!</div>
             <div class="countdown-num" id="countdown-num">3</div>
         </div>
 
-        <!-- DAVET POPUP -->
         <div id="popup-invite" class="popup-overlay">
             <div class="popup-box">
                 <h2 style="color: rgb(67, 97, 238); margin-bottom: 10px;" id="inv-sender">Oyuncu</h2>
@@ -404,7 +399,6 @@
     </div>
 
     <script>
-        // GLOBALS
         let ws = null;
         let myUsername = "";
         let currentGameId = 0;
@@ -412,11 +406,9 @@
         let inviteSize = 9;
         let gameState = "HAZIRLIK";
         let bombsPlaced = 0;
-        let myRole = ""; // p1 veya p2
+        let myRole = "";
 
-        // BAĞLANTI
         function connectWebSocket() {
-            // Render üzerindeki sunucu adresi
             ws = new WebSocket("wss://bomorsafe.onrender.com");
 
             ws.onopen = () => {
@@ -435,7 +427,7 @@
             };
 
             ws.onclose = () => {
-                console.log("Bağlantı kapandı, yeniden bağlanıyor...");
+                console.log("Bağlantı kapandı");
                 updateConnectionStatus("disconnected");
                 setTimeout(connectWebSocket, 3000);
             };
@@ -521,37 +513,33 @@
                 updateStatus(data.turn);
             }
             else if (data.type === "UPDATE_BOARD") {
-               if (data.opener === myUsername) {
-                 const cell = document.getElementById(`tile-${data.r}-${data.c}`);
-                 if (cell) {
-                    cell.innerHTML = "";
-                    cell.textContent = data.res;
-                    cell.className = "tile result-" + data.res.toLowerCase();
-        }
-    }
-
-    // Canları güncelle
-    document.getElementById("my-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p1_lives : data.p2_lives);
-    document.getElementById("opp-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p2_lives : data.p1_lives);
-
-    updateStatus(data.turn);
-}
+                if (data.opener === myUsername) {
+                    const cell = document.getElementById(`tile-${data.r}-${data.c}`);
+                    if (cell) {
+                        cell.innerHTML = "";
+                        cell.textContent = data.res;
+                        cell.className = "tile result-" + data.res.toLowerCase();
+                    }
+                }
+                document.getElementById("my-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p1_lives : data.p2_lives);
+                document.getElementById("opp-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p2_lives : data.p1_lives);
+                updateStatus(data.turn);
+            }
             else if (data.type === "GAME_OVER") {
-    gameState = "BITTI";
-    const status = document.getElementById("game-status");
-    const won = (data.winner === myUsername);
+                gameState = "BITTI";
+                const status = document.getElementById("game-status");
+                const won = (data.winner === myUsername);
+                if (won) {
+                    status.textContent = "🎉 TEBRİKLER, KAZANDINIZ!";
+                    status.style.color = "rgb(16, 185, 129)";
+                } else {
+                    status.textContent = "💀 KAYBETTİNİZ";
+                    status.style.color = "rgb(239, 68, 68)";
+                }
+                document.getElementById("btn-back-lobby").style.display = "block";
+            }
+        }
 
-    if (won) {
-        status.textContent = " TEBRİKLER, KAZANDINIZ!";
-        status.style.color = "rgb(16, 185, 129)";
-    } else {
-        status.textContent = " KAYBETTİNİZ";
-        status.style.color = "rgb(239, 68, 68)";
-    }
-
-    document.getElementById("btn-back-lobby").style.display = "block";
-}
-        // EKRAN YÖNETİMİ
         function changeScreen(id) {
             document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
             document.getElementById(id).classList.add("active");
@@ -586,7 +574,6 @@
             send("REGISTER", {username: u, password: p});
         }
 
-        // LOBİ
         function resetLobby() {
             document.getElementById("lobby-menu").style.display = "block";
             document.getElementById("lobby-search").style.display = "none";
@@ -667,7 +654,6 @@
             resetLobby();
         }
 
-        // OYUN
         function setupGrid(totalTiles) {
             const container = document.getElementById("grid-container");
             container.innerHTML = "";
@@ -689,58 +675,57 @@
         }
 
         function doMove(r, c) {
-    if (gameState === "HAZIRLIK") {
-        if (bombsPlaced < 3) {
-            send("PLACE_BOMB", {gid: currentGameId, r: r, c: c});
-            bombsPlaced++;
+            if (gameState === "HAZIRLIK") {
+                if (bombsPlaced < 3) {
+                    send("PLACE_BOMB", {gid: currentGameId, r: r, c: c});
+                    bombsPlaced++;
 
-            const st = document.getElementById("game-status");
-            if (bombsPlaced < 3) {
-                st.textContent = `Bomba Yerleştir: ${3 - bombsPlaced} Kaldı`;
-                st.style.color = "rgb(251, 191, 36)";
-            } else {
-                st.textContent = "Rakip Bekleniyor...";
-                st.style.color = "rgb(251, 146, 60)";
+                    const st = document.getElementById("game-status");
+                    if (bombsPlaced < 3) {
+                        st.textContent = `Bomba Yerleştir: ${3 - bombsPlaced} Kaldı`;
+                        st.style.color = "rgb(251, 191, 36)";
+                    } else {
+                        st.textContent = "Rakip Bekleniyor...";
+                        st.style.color = "rgb(251, 146, 60)";
+                    }
+                }
+            }
+            else if (gameState === "OYNANIYOR") {
+                send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
             }
         }
-    }
-    else if (gameState === "OYNANIYOR") {
-        // SADECE SIRA BENDEYSEYİZ HAMLE YAPABİLİRİZ - Kontrol kaldırıldı, server kontrol edecek
-        send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
-    }
-}
 
         function startCountdown() {
-    const layer = document.getElementById("countdown-layer");
-    const num = document.getElementById("countdown-num");
-    layer.style.display = "flex";
+            const layer = document.getElementById("countdown-layer");
+            const num = document.getElementById("countdown-num");
+            layer.style.display = "flex";
 
-    let count = 3;
-    num.textContent = count;
-
-    const timer = setInterval(() => {
-        count--;
-        if (count > 0) {
+            let count = 3;
             num.textContent = count;
-            num.style.animation = "none";
-            setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
-        } else if (count === 0) {
-            num.textContent = "BAŞLA!";
-            num.style.animation = "none";
-            setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
 
-            // GRİD'İ TEMİZLE
-            document.querySelectorAll('.tile').forEach(tile => {
-                tile.innerHTML = "";
-                tile.className = "tile";
-            });
+            const timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    num.textContent = count;
+                    num.style.animation = "none";
+                    setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
+                } else if (count === 0) {
+                    num.textContent = "BAŞLA!";
+                    num.style.animation = "none";
+                    setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
 
-        } else {
-            clearInterval(timer);
-            layer.style.display = "none";
+                    document.querySelectorAll('.tile').forEach(tile => {
+                        tile.innerHTML = "";
+                        tile.className = "tile";
+                    });
+
+                } else {
+                    clearInterval(timer);
+                    layer.style.display = "none";
+                }
+            }, 1000);
         }
-    }, 1000);
-}
+
         function resetGameUI() {
             document.getElementById("my-hearts").textContent = "❤️❤️❤️";
             document.getElementById("opp-hearts").textContent = "❤️❤️❤️";
@@ -752,7 +737,7 @@
         function updateStatus(turn) {
             const st = document.getElementById("game-status");
             if (turn === myUsername) {
-                st.textContent = "⚡ SIRA SENDE!";
+                st.textContent = " SIRA SENDE!";
                 st.style.color = "rgb(16, 185, 129)";
             } else {
                 st.textContent = " Rakip Düşünüyor...";
@@ -760,7 +745,6 @@
             }
         }
 
-        // Sayfa yüklendiğinde bağlan
         window.onload = () => {
             connectWebSocket();
         };
