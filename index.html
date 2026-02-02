@@ -8,14 +8,14 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            user-select: none;
-        }
+    background: linear-gradient(135deg, #434190 0%, #2c3e8f 100%); /* Koyu mavi tonları */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+}
 
         #game-container {
             width: 400px;
@@ -521,27 +521,36 @@
                 updateStatus(data.turn);
             }
             else if (data.type === "UPDATE_BOARD") {
-                const cell = document.getElementById(`tile-${data.r}-${data.c}`);
-                if (cell) {
+               if (data.opener === myUsername) {
+                 const cell = document.getElementById(`tile-${data.r}-${data.c}`);
+                 if (cell) {
                     cell.innerHTML = "";
                     cell.textContent = data.res;
                     cell.className = "tile result-" + data.res.toLowerCase();
-                }
-
-                document.getElementById("my-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p1_lives : data.p2_lives);
-                document.getElementById("opp-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p2_lives : data.p1_lives);
-
-                updateStatus(data.turn);
-            }
-            else if (data.type === "GAME_OVER") {
-                const status = document.getElementById("game-status");
-                const won = (data.winner === myUsername);
-                status.textContent = won ? "🎉 KAZANDIN!" : "💀 KAYBETTİN";
-                status.style.color = won ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)";
-                document.getElementById("btn-back-lobby").style.display = "block";
-            }
         }
+    }
 
+    // Canları güncelle
+    document.getElementById("my-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p1_lives : data.p2_lives);
+    document.getElementById("opp-hearts").textContent = "❤️".repeat(myRole === "p1" ? data.p2_lives : data.p1_lives);
+
+    updateStatus(data.turn);
+}
+            else if (data.type === "GAME_OVER") {
+    gameState = "BITTI";
+    const status = document.getElementById("game-status");
+    const won = (data.winner === myUsername);
+
+    if (won) {
+        status.textContent = " TEBRİKLER, KAZANDINIZ!";
+        status.style.color = "rgb(16, 185, 129)";
+    } else {
+        status.textContent = " KAYBETTİNİZ";
+        status.style.color = "rgb(239, 68, 68)";
+    }
+
+    document.getElementById("btn-back-lobby").style.display = "block";
+}
         // EKRAN YÖNETİMİ
         function changeScreen(id) {
             document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
@@ -680,51 +689,58 @@
         }
 
         function doMove(r, c) {
-            if (gameState === "HAZIRLIK") {
-                if (bombsPlaced < 3) {
-                    send("PLACE_BOMB", {gid: currentGameId, r: r, c: c});
-                    bombsPlaced++;
+    if (gameState === "HAZIRLIK") {
+        if (bombsPlaced < 3) {
+            send("PLACE_BOMB", {gid: currentGameId, r: r, c: c});
+            bombsPlaced++;
 
-                    const st = document.getElementById("game-status");
-                    if (bombsPlaced < 3) {
-                        st.textContent = `Bomba Yerleştir: ${3 - bombsPlaced} Kaldı`;
-                        st.style.color = "rgb(251, 191, 36)";
-                    } else {
-                        st.textContent = "Rakip Bekleniyor...";
-                        st.style.color = "rgb(251, 146, 60)";
-                    }
-                }
-            }
-            else if (gameState === "OYNANIYOR") {
-                send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
+            const st = document.getElementById("game-status");
+            if (bombsPlaced < 3) {
+                st.textContent = `Bomba Yerleştir: ${3 - bombsPlaced} Kaldı`;
+                st.style.color = "rgb(251, 191, 36)";
+            } else {
+                st.textContent = "Rakip Bekleniyor...";
+                st.style.color = "rgb(251, 146, 60)";
             }
         }
+    }
+    else if (gameState === "OYNANIYOR") {
+        // SADECE SIRA BENDEYSEYİZ HAMLE YAPABİLİRİZ - Kontrol kaldırıldı, server kontrol edecek
+        send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
+    }
+}
 
         function startCountdown() {
-            const layer = document.getElementById("countdown-layer");
-            const num = document.getElementById("countdown-num");
-            layer.style.display = "flex";
+    const layer = document.getElementById("countdown-layer");
+    const num = document.getElementById("countdown-num");
+    layer.style.display = "flex";
 
-            let count = 3;
+    let count = 3;
+    num.textContent = count;
+
+    const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
             num.textContent = count;
+            num.style.animation = "none";
+            setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
+        } else if (count === 0) {
+            num.textContent = "BAŞLA!";
+            num.style.animation = "none";
+            setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
 
-            const timer = setInterval(() => {
-                count--;
-                if (count > 0) {
-                    num.textContent = count;
-                    num.style.animation = "none";
-                    setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
-                } else if (count === 0) {
-                    num.textContent = "BAŞLA!";
-                    num.style.animation = "none";
-                    setTimeout(() => num.style.animation = "bounceIn 0.5s", 10);
-                } else {
-                    clearInterval(timer);
-                    layer.style.display = "none";
-                }
-            }, 1000);
+            // GRİD'İ TEMİZLE
+            document.querySelectorAll('.tile').forEach(tile => {
+                tile.innerHTML = "";
+                tile.className = "tile";
+            });
+
+        } else {
+            clearInterval(timer);
+            layer.style.display = "none";
         }
-
+    }, 1000);
+}
         function resetGameUI() {
             document.getElementById("my-hearts").textContent = "❤️❤️❤️";
             document.getElementById("opp-hearts").textContent = "❤️❤️❤️";
@@ -739,7 +755,7 @@
                 st.textContent = "⚡ SIRA SENDE!";
                 st.style.color = "rgb(16, 185, 129)";
             } else {
-                st.textContent = "⏳ Rakip Düşünüyor...";
+                st.textContent = " Rakip Düşünüyor...";
                 st.style.color = "rgb(107, 114, 128)";
             }
         }
