@@ -83,8 +83,12 @@ class GameState:
         return False
 
     def make_move(self, username, r, c):
-        if self.status != "OYNANIYOR" or username != self.turn:
+        # Oyun oynuyor mu ve sıra bu kullanıcıda mı kontrol et
+        if self.status != "OYNANIYOR":
             return None
+
+        if username != self.turn:
+            return None  # Sıra sende değil
 
         # Rakip tahtasına bak
         opponent_board = self.p2_board if username == self.p1_name else self.p1_board
