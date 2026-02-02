@@ -1,8 +1,10 @@
+
 import asyncio
 import websockets
 import json
 import sqlite3
 import random
+from datetime import datetime
 
 
 # --- VERİTABANI ---
@@ -13,7 +15,8 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   username TEXT UNIQUE, 
                   password TEXT, 
-                  wins INTEGER DEFAULT 0)''')
+                  wins INTEGER DEFAULT 0,
+                  created_at TEXT)''')
     conn.commit()
     conn.close()
 
@@ -22,7 +25,10 @@ init_db()
 
 connected_users = {}  # {username: websocket}
 active_games = {}  # {game_id: GameState}
+pending_invites = {}  # {to_user: {from_user, size}}
+waiting_rooms = {}  # {username: size} - Oyun oluşturanlar
 game_id_counter = 100
+
 
 class GameState:
     def __init__(self, p1_name, p2_name, size=9):
@@ -47,23 +53,26 @@ class GameState:
         self.turn = p1_name  # Sıra kimde
         self.status = "HAZIRLIK"  # HAZIRLIK -> GERISAYIM -> OYNANIYOR -> BITTI
 
-        # Açılan kareler: (r, c, type, who_opened)
+        # Açılan kareler
         self.revealed = []
 
     def place_bomb(self, username, r, c):
-        if self.status != "HAZIRLIK": return False
+        if self.status != "HAZIRLIK":
+            return False
 
         if username == self.p1_name:
             if self.p1_bombs_placed < 3 and self.p1_board[r][c] == 0:
                 self.p1_board[r][c] = 1
                 self.p1_bombs_placed += 1
-                if self.p1_bombs_placed == 3: self.p1_ready = True
+                if self.p1_bombs_placed == 3:
+                    self.p1_ready = True
                 return True
         elif username == self.p2_name:
             if self.p2_bombs_placed < 3 and self.p2_board[r][c] == 0:
                 self.p2_board[r][c] = 1
                 self.p2_bombs_placed += 1
-                if self.p2_bombs_placed == 3: self.p2_ready = True
+                if self.p2_bombs_placed == 3:
+                    self.p2_ready = True
                 return True
         return False
 
@@ -107,67 +116,151 @@ async def handler(websocket):
             data = json.loads(message)
             komut = data.get("komut")
 
+            # --- GİRİŞ ---
             if komut == "LOGIN":
                 user = data.get("username")
                 pw = data.get("password")
+
+                if not user or not pw:
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Kullanıcı adı ve şifre gerekli!"}))
+                    continue
+
                 conn = sqlite3.connect('bombom_users.db')
                 c = conn.cursor()
                 c.execute("SELECT * FROM users WHERE username=? AND password=?", (user, pw))
-                if c.fetchone():
+                result = c.fetchone()
+                conn.close()
+
+                if result:
+                    # Zaten bağlıysa eski bağlantıyı kapat
+                    if user in connected_users:
+                        try:
+                            await connected_users[user].close()
+                        except:
+                            pass
+
                     current_user = user
                     connected_users[user] = websocket
                     await websocket.send(json.dumps({"type": "LOGIN_SUCCESS", "username": user}))
                 else:
-                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Hatalı giriş!"}))
-                conn.close()
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Hatalı kullanıcı adı veya şifre!"}))
 
+            # --- KAYIT ---
             elif komut == "REGISTER":
                 user = data.get("username")
                 pw = data.get("password")
+
+                if not user or not pw:
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Tüm alanları doldur!"}))
+                    continue
+
+                if len(pw) < 8:
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Şifre en az 8 karakter olmalı!"}))
+                    continue
+
                 conn = sqlite3.connect('bombom_users.db')
                 c = conn.cursor()
                 try:
-                    c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (user, pw))
+                    c.execute("INSERT INTO users (username, password, created_at) VALUES (?, ?, ?)",
+                              (user, pw, datetime.now().isoformat()))
                     conn.commit()
                     await websocket.send(json.dumps({"type": "REGISTER_SUCCESS"}))
-                except:
-                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Kullanıcı adı dolu!"}))
-                conn.close()
+                except sqlite3.IntegrityError:
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Bu kullanıcı adı zaten alınmış!"}))
+                finally:
+                    conn.close()
 
+            # --- ODALAR LİSTESİ ---
             elif komut == "GET_ROOMS":
-                # Basit oda listesi (Host olanlar)
-                # Not: Gerçek bir oda listesi için ayrı yapı kurulabilir ama şimdilik online kullanıcıları dönüyoruz
-                users = [u for u in connected_users if u != current_user]
-                await websocket.send(
-                    json.dumps({"type": "ROOM_LIST", "rooms": [{"host": u, "size": 9} for u in users]}))
+                rooms = []
+                for host, size in waiting_rooms.items():
+                    if host != current_user and host in connected_users:
+                        rooms.append({"host": host, "size": size})
 
-            elif komut == "SEND_INVITE":
-                target = data.get("target")
-                size = int(data.get("size", 9))  # Varsayılan 9
-                if target in connected_users:
-                    await connected_users[target].send(json.dumps({
-                        "type": "INVITE_RECEIVED", "from": current_user, "size": size
+                await websocket.send(json.dumps({"type": "ROOM_LIST", "rooms": rooms}))
+
+            # --- ODA OLUŞTUR ---
+            elif komut == "CREATE_ROOM":
+                size = int(data.get("size", 9))
+                waiting_rooms[current_user] = size
+                await websocket.send(json.dumps({"type": "ROOM_CREATED", "size": size}))
+
+            # --- ODADAN AYRIL ---
+            elif komut == "LEAVE_ROOM":
+                if current_user in waiting_rooms:
+                    del waiting_rooms[current_user]
+
+            # --- KATILMA İSTEĞİ ---
+            elif komut == "JOIN_REQUEST":
+                host = data.get("host")
+
+                if host in connected_users and host in waiting_rooms:
+                    # Host'a bildir
+                    await connected_users[host].send(json.dumps({
+                        "type": "INVITE_RECEIVED",
+                        "from": current_user,
+                        "size": waiting_rooms[host]
                     }))
 
+                    # İsteği sakla
+                    pending_invites[host] = {"from": current_user, "size": waiting_rooms[host]}
+
+            # --- DİREKT DAVET ---
+            elif komut == "SEND_INVITE":
+                target = data.get("target")
+                size = int(data.get("size", 9))
+
+                if target in connected_users:
+                    await connected_users[target].send(json.dumps({
+                        "type": "INVITE_RECEIVED",
+                        "from": current_user,
+                        "size": size
+                    }))
+
+                    pending_invites[target] = {"from": current_user, "size": size}
+                    await websocket.send(json.dumps({"type": "INVITE_SENT"}))
+                else:
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Kullanıcı bulunamadı!"}))
+
+            # --- DAVETI KABUL ET ---
             elif komut == "ACCEPT_INVITE":
                 target = data.get("target")  # Davet eden
                 size = int(data.get("size", 9))
+
+                if target not in connected_users:
+                    await websocket.send(json.dumps({"type": "ERROR", "msg": "Kullanıcı çevrimdışı!"}))
+                    continue
 
                 # OYUNU BAŞLAT
                 global game_id_counter
                 gid = game_id_counter
                 game_id_counter += 1
 
-                # Yeni oyun objesi oluştur
+                # Yeni oyun objesi
                 active_games[gid] = GameState(target, current_user, size)
+
+                # Odayı temizle
+                if target in waiting_rooms:
+                    del waiting_rooms[target]
+                if current_user in waiting_rooms:
+                    del waiting_rooms[current_user]
 
                 # İki tarafa da bildir
                 msg = {"type": "GAME_INIT", "gid": gid, "p1": target, "p2": current_user, "size": size}
 
-                if target in connected_users:
-                    await connected_users[target].send(json.dumps(msg))
+                await connected_users[target].send(json.dumps(msg))
                 await websocket.send(json.dumps(msg))
 
+            # --- DAVETI REDDET ---
+            elif komut == "DECLINE_INVITE":
+                target = data.get("target")
+                if target in connected_users:
+                    await connected_users[target].send(json.dumps({
+                        "type": "INVITE_DECLINED",
+                        "from": current_user
+                    }))
+
+            # --- BOMBA YERLEŞTİR ---
             elif komut == "PLACE_BOMB":
                 gid = data.get("gid")
                 r = data.get("r")
@@ -177,29 +270,31 @@ async def handler(websocket):
                     game = active_games[gid]
                     success = game.place_bomb(current_user, r, c)
 
-                    # Sadece bana bombayı koyduğumu söyle (Rakip görmemeli)
                     if success:
+                        # Sadece kendine bildir
                         await websocket.send(json.dumps({"type": "BOMB_PLACED", "r": r, "c": c}))
 
-                        # Eğer herkes hazırsa Geri Sayımı başlat
+                        # Her iki oyuncu da hazırsa geri sayım başlat
                         if game.check_start():
-                            # İki tarafa da geri sayım gönder
                             start_msg = {"type": "START_COUNTDOWN"}
+
                             if game.p1_name in connected_users:
                                 await connected_users[game.p1_name].send(json.dumps(start_msg))
                             if game.p2_name in connected_users:
                                 await connected_users[game.p2_name].send(json.dumps(start_msg))
 
-                            # 3 saniye bekle ve oyunu başlat (Async sleep)
+                            # 3.5 saniye bekle
                             await asyncio.sleep(3.5)
                             game.status = "OYNANIYOR"
 
                             play_msg = {"type": "GAME_STARTED_NOW", "turn": game.turn}
+
                             if game.p1_name in connected_users:
                                 await connected_users[game.p1_name].send(json.dumps(play_msg))
                             if game.p2_name in connected_users:
                                 await connected_users[game.p2_name].send(json.dumps(play_msg))
 
+            # --- HAMLE YAP ---
             elif komut == "GAME_MOVE":
                 gid = data.get("gid")
                 r = data.get("r")
@@ -220,29 +315,50 @@ async def handler(websocket):
                             "opener": current_user
                         }
 
-                        # İki tarafa da güncelleme gönder
+                        # İki tarafa da gönder
                         if game.p1_name in connected_users:
                             await connected_users[game.p1_name].send(json.dumps(update_msg))
                         if game.p2_name in connected_users:
                             await connected_users[game.p2_name].send(json.dumps(update_msg))
 
+                        # Oyun bitti mi?
                         if game.status == "BITTI":
-                            end_msg = {"type": "GAME_OVER",
-                                       "winner": game.p1_name if game.p1_lives > 0 else game.p2_name}
+                            winner = game.p1_name if game.p1_lives > 0 else game.p2_name
+
+                            # Veritabanında kazananı güncelle
+                            conn = sqlite3.connect('bombom_users.db')
+                            c = conn.cursor()
+                            c.execute("UPDATE users SET wins = wins + 1 WHERE username = ?", (winner,))
+                            conn.commit()
+                            conn.close()
+
+                            end_msg = {"type": "GAME_OVER", "winner": winner}
+
                             if game.p1_name in connected_users:
                                 await connected_users[game.p1_name].send(json.dumps(end_msg))
                             if game.p2_name in connected_users:
                                 await connected_users[game.p2_name].send(json.dumps(end_msg))
 
+                            # Oyunu sil
+                            del active_games[gid]
+
+    except websockets.exceptions.ConnectionClosed:
+        print(f"Bağlantı kapandı: {current_user}")
     except Exception as e:
-        print("Hata:", e)
+        print(f"Hata ({current_user}): {e}")
     finally:
-        if current_user in connected_users:
-            del connected_users[current_user]
+        # Temizlik
+        if current_user:
+            if current_user in connected_users:
+                del connected_users[current_user]
+            if current_user in waiting_rooms:
+                del waiting_rooms[current_user]
 
 
 async def main():
+    print("Server başlatılıyor...")
     async with websockets.serve(handler, "0.0.0.0", 10000):
+        print("Server 10000 portunda çalışıyor!")
         await asyncio.Future()
 
 
