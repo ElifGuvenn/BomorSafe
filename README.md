@@ -21,6 +21,7 @@ Projeyi kendi bilgisayarınızda (lokal olarak) çalıştırmak ve geliştirmek 
 python -m venv venv
 
 Sanal Ortamı Aktifleştirin:
+
 Mac / Linux için:
 source venv/bin/activate
 
