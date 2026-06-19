@@ -267,6 +267,79 @@
         .status-connecting { background: #fbbf24; color: white; }
         .status-connected { background: #10b981; color: white; }
         .status-disconnected { background: #ef4444; color: white; }
+
+        #chat-toggle-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+            z-index: 50;
+        }
+
+        #chat-panel {
+            position: absolute;
+            top: 58px;
+            right: 12px;
+            width: 220px;
+            max-height: 320px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            z-index: 50;
+            display: none;
+            padding: 8px;
+        }
+
+        #chat-panel.open { display: block; }
+
+        .chat-phrase-btn {
+            width: 100%;
+            text-align: left;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .chat-phrase-btn:hover { background: #e5e7eb; }
+        .chat-phrase-btn:active { background: #d1d5db; }
+
+        .chat-bubble {
+            position: absolute;
+            top: 110px;
+            max-width: 170px;
+            background: white;
+            border: 2px solid rgb(67, 97, 238);
+            border-radius: 14px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            z-index: 60;
+            animation: bubblePop 0.25s ease-out;
+        }
+
+        .chat-bubble-me { left: 10px; border-color: rgb(52, 211, 153); }
+        .chat-bubble-opp { right: 10px; border-color: rgb(107, 114, 128); }
+
+        @keyframes bubblePop {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -359,6 +432,9 @@
         <div id="screen-game" class="screen">
             <div style="width: 100%; height: 120px; background: linear-gradient(to bottom, rgb(67, 97, 238), rgb(45, 55, 180));"></div>
 
+            <button id="chat-toggle-btn" onclick="toggleChat()">💬</button>
+            <div id="chat-panel"></div>
+
             <div class="player-card card-p1">
                 <div>SEN</div>
                 <div class="hearts" id="my-hearts">❤️❤️❤️</div>
@@ -403,7 +479,7 @@
         let inviteFrom = "";
         let inviteSize = 9;
         let gameState = "HAZIRLIK";
-        let bombsPlaced = 0;
+        let myBombs = new Set(); // "r-c" şeklinde, kendi yerleştirdiğim bombalar
         let myRole = "";
         let reconnectInterval = null;
         let heartbeatInterval = null;
@@ -532,15 +608,27 @@
                 currentGameId = data.gid;
                 myRole = (data.p1 === myUsername) ? "p1" : "p2";
                 gameState = "HAZIRLIK";
-                bombsPlaced = 0;
+                myBombs.clear();
                 setupGrid(data.size);
+                setupChatPanel();
                 document.getElementById("popup-invite").style.display = "none";
                 changeScreen("screen-game");
                 resetGameUI();
             }
             else if (data.type === "BOMB_PLACED") {
+                myBombs.add(`${data.r}-${data.c}`);
                 const cell = document.getElementById(`tile-${data.r}-${data.c}`);
                 if (cell) cell.innerHTML = '<div class="bomb-marker"></div>';
+                updateBombStatus();
+            }
+            else if (data.type === "BOMB_REMOVED") {
+                myBombs.delete(`${data.r}-${data.c}`);
+                const cell = document.getElementById(`tile-${data.r}-${data.c}`);
+                if (cell) cell.innerHTML = "";
+                updateBombStatus();
+            }
+            else if (data.type === "CHAT_RECEIVED") {
+                showChatBubble("opp", data.text);
             }
             else if (data.type === "START_COUNTDOWN") {
                 startCountdown();
@@ -609,6 +697,8 @@
         function returnToLobby() {
             changeScreen("screen-lobby");
             resetLobby();
+            document.getElementById("chat-panel").classList.remove("open");
+            document.querySelectorAll(".chat-bubble").forEach(b => b.remove());
         }
 
         // --- KULLANICI İŞLEMLERİ ---
@@ -676,20 +766,27 @@
 
         function doMove(r, c) {
             if(gameState === "HAZIRLIK") {
-                if(bombsPlaced < 3) {
+                const key = `${r}-${c}`;
+                if(myBombs.has(key)) {
+                    // Aynı kareye tekrar basıldı -> bombayı geri al
+                    send("REMOVE_BOMB", {gid: currentGameId, r: r, c: c});
+                } else if(myBombs.size < 3) {
                     send("PLACE_BOMB", {gid: currentGameId, r: r, c: c});
-                    bombsPlaced++;
-                    const st = document.getElementById("game-status");
-                    if(bombsPlaced < 3) {
-                        st.textContent = `Bomba Koy: ${3-bombsPlaced} Kaldı`;
-                        st.style.color = "#fbbf24";
-                    } else {
-                        st.textContent = "Rakip Bekleniyor...";
-                        st.style.color = "#9ca3af";
-                    }
                 }
             } else if(gameState === "OYNANIYOR") {
                 send("GAME_MOVE", {gid: currentGameId, r: r, c: c});
+            }
+        }
+
+        function updateBombStatus() {
+            const st = document.getElementById("game-status");
+            const left = 3 - myBombs.size;
+            if(left > 0) {
+                st.textContent = `Bomba Koy: ${left} Kaldı (Geri almak için tekrar tıkla)`;
+                st.style.color = "#fbbf24";
+            } else {
+                st.textContent = "Rakip Bekleniyor...";
+                st.style.color = "#9ca3af";
             }
         }
 
@@ -719,6 +816,51 @@
             const st = document.getElementById("game-status");
             st.textContent = "Bombaları Yerleştir: 3 Adet";
             st.style.color = "rgb(251, 191, 36)";
+        }
+
+        // --- LAF ATMA (CHAT) ---
+        const chatPhrases = [
+        
+            "Satranç mı oynuyoruz?",
+            "Çok düşünme, patlat gitsin! ",
+            "Bravo, hiç bilemedin!",
+            "Şansına küs!",
+            "Geç kaldın canım, geç!",
+        ];
+
+        function setupChatPanel() {
+            const panel = document.getElementById("chat-panel");
+            panel.innerHTML = "";
+            chatPhrases.forEach(p => {
+                const b = document.createElement("button");
+                b.className = "chat-phrase-btn";
+                b.textContent = p;
+                b.onclick = () => sendChatPhrase(p);
+                panel.appendChild(b);
+            });
+        }
+
+        function toggleChat() {
+            document.getElementById("chat-panel").classList.toggle("open");
+        }
+
+        function sendChatPhrase(text) {
+            send("CHAT_MSG", {gid: currentGameId, text: text});
+            showChatBubble("me", text);
+            document.getElementById("chat-panel").classList.remove("open");
+        }
+
+        function showChatBubble(who, text) {
+            const old = document.getElementById(`chat-bubble-${who}`);
+            if (old) old.remove();
+
+            const bubble = document.createElement("div");
+            bubble.id = `chat-bubble-${who}`;
+            bubble.className = "chat-bubble chat-bubble-" + who;
+            bubble.textContent = text;
+            document.getElementById("screen-game").appendChild(bubble);
+
+            setTimeout(() => bubble.remove(), 3000);
         }
 
         function updateStatus(turn) {

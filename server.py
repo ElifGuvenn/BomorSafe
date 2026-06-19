@@ -72,6 +72,24 @@ class GameState:
                 return True
         return False
 
+    def remove_bomb(self, username, r, c):
+        if self.status != "HAZIRLIK":
+            return False
+
+        if username == self.p1_name:
+            if self.p1_board[r][c] == 1:
+                self.p1_board[r][c] = 0
+                self.p1_bombs_placed -= 1
+                self.p1_ready = False
+                return True
+        elif username == self.p2_name:
+            if self.p2_board[r][c] == 1:
+                self.p2_board[r][c] = 0
+                self.p2_bombs_placed -= 1
+                self.p2_ready = False
+                return True
+        return False
+
     def check_start(self):
         if self.p1_ready and self.p2_ready:
             self.status = "GERISAYIM"
@@ -268,6 +286,33 @@ async def handler(websocket):
                                 await connected_users[game.p1_name].send(json.dumps(play_msg))
                             if game.p2_name in connected_users:
                                 await connected_users[game.p2_name].send(json.dumps(play_msg))
+
+            elif komut == "REMOVE_BOMB":
+                gid = data.get("gid")
+                r = data.get("r")
+                c = data.get("c")
+
+                if gid in active_games:
+                    game = active_games[gid]
+                    success = game.remove_bomb(current_user, r, c)
+
+                    if success:
+                        await websocket.send(json.dumps({"type": "BOMB_REMOVED", "r": r, "c": c}))
+
+            elif komut == "CHAT_MSG":
+                gid = data.get("gid")
+                text = data.get("text", "")
+
+                if gid in active_games:
+                    game = active_games[gid]
+                    target_name = game.p2_name if current_user == game.p1_name else game.p1_name
+
+                    if target_name in connected_users:
+                        await connected_users[target_name].send(json.dumps({
+                            "type": "CHAT_RECEIVED",
+                            "from": current_user,
+                            "text": text
+                        }))
 
             elif komut == "GAME_MOVE":
                 gid = data.get("gid")
